@@ -1,4 +1,4 @@
-obj-m += gpio_module.o
+obj-m += gpio_driver.o
 
 KDIR = /lib/modules/$(shell uname -r)/build
 
@@ -7,4 +7,3 @@ all:
 
 clean:
 	make -C $(KDIR) M=$(shell pwd) clean
-	

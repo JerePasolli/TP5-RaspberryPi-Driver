@@ -1,21 +1,38 @@
-#include <linux/kernel.h>
+#include <linux/cdev.h>
 #include <linux/init.h>
+#include <linux/delay.h>
+#include <linux/fs.h>
+#include <linux/gpio.h>
+#include <linux/interrupt.h>
+#include <linux/kdev_t.h>
 #include <linux/module.h>
-#include <linux/proc_fs.h>
-#include <linux/slab.h>
-#include <asm/io.h>
+#include <linux/semaphore.h>
+#include <linux/timekeeping.h>
+#include <linux/uaccess.h>
+#include <linux/wait.h>
+#include <asm/atomic.h>
 
 #define MAX_USER_SIZE 1024
 
 #define BCM2837_GPIO_ADDRESS 0x3F200000
 #define BCM2711_GPIO_ADDRESS 0xfe200000
 
-static struct proc_dir_entry *proc = NULL;
+//static struct proc_dir_entry *proc = NULL;
 
 static char data_buffer[MAX_USER_SIZE + 1] = {0};
 
 static unsigned int *gpio_registers = NULL;
 static unsigned int gpio_selected = 22;
+
+struct cdev *gpio_cdev;
+int drv_major = 0;
+
+// static const struct proc_ops proc_fops = {
+//         .proc_read = read,
+//         .proc_write = write,
+// };
+
+
 
 static void gpio_pin_setup(unsigned int pin) {
     unsigned int fsel_index = pin / 10;
@@ -36,13 +53,23 @@ static int read_gpio(unsigned int pin) {
     return (*gpio_lev & (1 << lev_bitpos)) ? 1 : 0;
 }
 
-ssize_t read(struct file *file, char __user *user, size_t size, loff_t *off)
+ssize_t read(struct file *file, char __user *buf, size_t count, loff_t *f_pos)
 {
     printk("Inside read");
+
+    if(*f_pos > 0) {
+        return 0; //EOF
+    }
+
     int r = read_gpio(gpio_selected);
     static char buffer[5];
     snprintf(buffer, sizeof(buffer), "%d", r);
-    return copy_to_user(user, buffer, 1) ? 0 : 1; // copia datos del espacio del kernel al espacio de usuario
+    if(copy_to_user(buf, &r, sizeof(r)))
+    {
+        return -EFAULT;
+    
+    }
+    return sizeof(r);
 }
 
 ssize_t write(struct file *file, const char __user *user, size_t size, loff_t *off)
@@ -77,38 +104,64 @@ ssize_t write(struct file *file, const char __user *user, size_t size, loff_t *o
     return size;
 }
 
-static const struct proc_ops proc_fops = {
-        .proc_read = read,
-        .proc_write = write,
+struct file_operations gpio_fops = {
+	.owner =     THIS_MODULE,
+	.read =	     read,
+    .write =     write
 };
 
 static int __init gpio_module_init(void) {
+
+    int result;
+    dev_t dev = MKDEV(drv_major,0);
+
+    printk("Initializing GPIO driver\n");
+    result = alloc_chrdev_region(&dev, 0, 1, "gpiodriver");
+    drv_major = MAJOR(dev);
+
+    if (result < 0) {
+        pr_alert("[GPIO]: Error in alloc_chrdev_region\n");
+        return result;
+    }
+
+    gpio_cdev = cdev_alloc();
+    gpio_cdev->ops = &gpio_fops;
+    result = cdev_add(gpio_cdev, dev, 1);
+    if (result < 0) {
+        printk("[GPIO]: Error in cdev_add\n");
+        unregister_chrdev_region(dev, 1);
+        return result;
+    }
+
     gpio_registers = (int *)ioremap(BCM2837_GPIO_ADDRESS, PAGE_SIZE);
     if (gpio_registers == NULL) {
-        printk("Failed to map GPIO memory to driver\n");
+        printk("Failed to map GPIO memory in Raspi to driver\n");
         return -1;
     }
 
 
-    printk("Successfully mapped in GPIO memory\n");
+    printk("Successfully loaded GPIO driver\n");
 
     // create an entry in the proc-fs
-    proc = proc_create("gpio", 0666, NULL, &proc_fops);
-    if (proc == NULL) {
-        return -1;
-    }
+    // proc = proc_create("gpio", 0666, NULL, &proc_fops);
+    // if (proc == NULL) {
+    //     return -1;
+    // }
 
-    printk("river loaded successfully!\n");
+    // printk("Driver loaded successfully\n");
 
     return 0;
 }
 
 static void __exit gpio_module_exit(void)
 {
-    printk("Leaving my driver!\n");
-    iounmap(gpio_registers);
-    proc_remove(proc);
-    return;
+    printk("Removing GPIO driver\n");
+    dev_t dev = MKDEV(drv_major,0);
+    cdev_del(gpio_cdev);
+    unregister_chrdev_region(dev, 1);
+
+    // iounmap(gpio_registers);
+    // proc_remove(proc);
 }
 
 module_init(gpio_module_init);
