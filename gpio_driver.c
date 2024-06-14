@@ -6,8 +6,6 @@
 #include <linux/interrupt.h>
 #include <linux/kdev_t.h>
 #include <linux/module.h>
-#include <linux/semaphore.h>
-#include <linux/timekeeping.h>
 #include <linux/uaccess.h>
 #include <linux/wait.h>
 #include <asm/atomic.h>
@@ -16,6 +14,8 @@
 
 #define BCM2837_GPIO_ADDRESS 0x3F200000
 #define BCM2711_GPIO_ADDRESS 0xfe200000
+
+#define DEV_NAME "gpiodriver"
 
 //static struct proc_dir_entry *proc = NULL;
 
@@ -26,13 +26,6 @@ static unsigned int gpio_selected = 22;
 
 struct cdev *gpio_cdev;
 int drv_major = 0;
-
-// static const struct proc_ops proc_fops = {
-//         .proc_read = read,
-//         .proc_write = write,
-// };
-
-
 
 static void gpio_pin_setup(unsigned int pin) {
     unsigned int fsel_index = pin / 10;
@@ -62,8 +55,7 @@ ssize_t read(struct file *file, char __user *buf, size_t count, loff_t *f_pos)
     }
 
     int r = read_gpio(gpio_selected);
-    static char buffer[5];
-    snprintf(buffer, sizeof(buffer), "%d", r);
+    udelay(1000);
     if(copy_to_user(buf, &r, sizeof(r)))
     {
         return -EFAULT;
@@ -116,7 +108,7 @@ static int __init gpio_module_init(void) {
     dev_t dev = MKDEV(drv_major,0);
 
     printk("Initializing GPIO driver\n");
-    result = alloc_chrdev_region(&dev, 0, 1, "gpiodriver");
+    result = alloc_chrdev_region(&dev, 0, 1, DEV_NAME);
     drv_major = MAJOR(dev);
 
     if (result < 0) {
@@ -139,16 +131,7 @@ static int __init gpio_module_init(void) {
         return -1;
     }
 
-
     printk("Successfully loaded GPIO driver\n");
-
-    // create an entry in the proc-fs
-    // proc = proc_create("gpio", 0666, NULL, &proc_fops);
-    // if (proc == NULL) {
-    //     return -1;
-    // }
-
-    // printk("Driver loaded successfully\n");
 
     return 0;
 }
@@ -159,9 +142,6 @@ static void __exit gpio_module_exit(void)
     dev_t dev = MKDEV(drv_major,0);
     cdev_del(gpio_cdev);
     unregister_chrdev_region(dev, 1);
-
-    // iounmap(gpio_registers);
-    // proc_remove(proc);
 }
 
 module_init(gpio_module_init);
@@ -169,5 +149,5 @@ module_exit(gpio_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("SistemOfACom");
-MODULE_DESCRIPTION("This module reads two gpio pins from the RASPI");
+MODULE_DESCRIPTION("This module reads two GPIO pins from the RASPI");
 MODULE_VERSION("1.0");
