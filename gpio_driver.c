@@ -13,11 +13,9 @@
 #define MAX_USER_SIZE 1024
 
 #define BCM2837_GPIO_ADDRESS 0x3F200000
-#define BCM2711_GPIO_ADDRESS 0xfe200000
 
 #define DEV_NAME "gpiodriver"
 
-//static struct proc_dir_entry *proc = NULL;
 
 static char data_buffer[MAX_USER_SIZE + 1] = {0};
 
@@ -48,8 +46,6 @@ static int read_gpio(unsigned int pin) {
 
 ssize_t read(struct file *file, char __user *buf, size_t count, loff_t *f_pos)
 {
-    printk("Inside read");
-
     if(*f_pos > 0) {
         return 0; //EOF
     }
@@ -76,8 +72,6 @@ ssize_t write(struct file *file, const char __user *user, size_t size, loff_t *o
 
     if (copy_from_user(data_buffer, user, size))
         return 0;
-
-    printk("Data buffer: %s\n", data_buffer);
 
     if (sscanf(data_buffer, "%d", &pin) != 1) {
         printk("Inproper data format submitted\n");
