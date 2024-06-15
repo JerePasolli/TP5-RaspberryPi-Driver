@@ -180,7 +180,7 @@ La función read se encarga de copiar al espacio de usuario el último valor le�
 
 ### Aplicación de usuario
 
-Esta aplicación es un script de Python, que se encarga de graficar en tiempo real la señal sensada, y permite también al usuario cambiar el pin que desea sensar, permitiendo seleccionar cualquier pin de la Raspberry (0-21). A continuación se presenta una imagen de la interfaz de usuario:
+La aplicación [monitor.py](monitor.py) es un script de Python, que se encarga de graficar en tiempo real la señal sensada, y permite también al usuario cambiar el pin que desea sensar, permitiendo seleccionar cualquier pin de la Raspberry (0-21). A continuación se presenta una imagen de la interfaz de usuario:
 
 ![Aplicación de usuario](./img/img3.png)
 
@@ -223,6 +223,29 @@ Y luego simplemente ejecutar el script de python:
 $ python3 monitor.py
 ```
 
-## Circuito propuesto y pruebas
+## Circuito propuesto, pruebas y resultados
 
 Pusimos a prueba la aplicación y el driver conectando diferentes componentes a varios pines de GPIO de la Raspberry.
+
+Al compilar y cargar el módulo con el script load_driver.sh, si luego ejecutamos el comando `dmesg` para ver los mensajes del kernel, podremos ver los mensajes impresos por el driver, indicando que se cargó correctamente, seguido de mensajes cada 1 segundo indicando la lectura del pin de GPIO:
+
+![Mensajes del kernel al cargar el módulo](./img/img4.png)
+
+Y al conectar un botón a la entrada correspondiente de GPIO, podemos variar el nivel de tensión del pin 0 V o 3,3 V, viendo la gráfica resultante en la aplicación de usuario:
+
+![Lectura graficada por app de usuario](./img/img5.png)
+
+Si desde el cuadro de texto de la GUI cambiamos de pin, podremos ver luego utilizando `dmesg` el cambio de pin por parte del driver:
+
+![Mensajes del kernel al cambiar de pin desde la GUI](./img/img6.png)
+
+### Imágenes del circuito y video
+
+En las siguientes imágenes se observa el circuito armado, en el cual tenemos conectado un botón y un dipswitch. Con esto se pueden cambiar los valroes de destintos pines de GPIO de las Raspberry y observar los cambios graficados en la GUI. Además, el circuito cuenta con leds indicadores del estado del pin (alto/bajo), para corroborar con el software de sensado.
+
+![Circuito con conexiones a pines de GPIO de la Raspberry](./img/img7.jpeg)
+![Circuito con conexiones a pines de GPIO de la Raspberry](./img/img8.jpeg)
+
+A continuación se adjunta un video del funcionamiento de todo el sistema en conjunto:
+
+[Video de funcionamiento](https://youtu.be/qzfFctLSnb4)

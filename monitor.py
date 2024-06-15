@@ -40,7 +40,7 @@ def read_data(file_path):
     try:
         with open(file_path, 'rb') as file:
             value = struct.unpack('i', file.read(4))[0]
-            return int(value * 3.3)
+            return float(value * 3.3)
     except Exception as e:
         print(f"Error leyendo el archivo: {e}")
         return None
