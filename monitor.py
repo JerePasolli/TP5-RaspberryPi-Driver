@@ -9,7 +9,7 @@ FILE_PATH = "/dev/gpiodriver"
 x_data = []
 y_data = []
 running = True
-window_size = 20
+window_size = 40
 
 # Configurar la gráfica
 plt.ion() 
@@ -18,7 +18,7 @@ plt.subplots_adjust(bottom=0.3)
 line, = ax.plot(x_data, y_data, 'r-')
 ax.set_xlabel('Tiempo (S)')
 ax.set_ylabel('Tensión (V)')
-ax.set_xlim(0, window_size)
+ax.set_xlim(0, window_size/2)
 ax.set_ylim(-0.1, 3.5)
 
 start_time = time.time()
@@ -73,7 +73,6 @@ def change_pin(pin):
         timer.start()
         text_box.set_val('')
 
-select_pin(FILE_PATH, "20")
 print("Seleccionado pin 20 por defecto")
 
 axbox = plt.axes([0.3, 0.15, 0.4, 0.05]) 
@@ -100,18 +99,18 @@ while running:
         line.set_ydata(y_data)
         
         if len(x_data) >= window_size:
-            ax.set_xlim(elapsed_time - window_size, elapsed_time)
+            ax.set_xlim(elapsed_time - window_size/2, elapsed_time)
         else:
-            ax.set_xlim(0, window_size)
+            ax.set_xlim(0, window_size/2)
         
         ax.relim()
-        ax.autoscale_view()
+        ax.autoscale_view(scaley=True)
         
         plt.draw()
-        plt.pause(1)
+        plt.pause(0.5)
         
     else:
-        time.sleep(1)
+        time.sleep(0.5)
         
 plt.ioff()
 plt.show()

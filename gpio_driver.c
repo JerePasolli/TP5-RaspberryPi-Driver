@@ -1,29 +1,25 @@
 #include <linux/cdev.h>
 #include <linux/init.h>
-#include <linux/delay.h>
 #include <linux/fs.h>
-#include <linux/gpio.h>
-#include <linux/interrupt.h>
+#include <linux/timer.h>
 #include <linux/kdev_t.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
-#include <linux/wait.h>
-#include <asm/atomic.h>
+#include <linux/interrupt.h>
 
 #define MAX_USER_SIZE 1024
-
 #define BCM2837_GPIO_ADDRESS 0x3F200000
-
 #define DEV_NAME "gpiodriver"
+#define INTERVAL_MS 1000 
 
 
 static char data_buffer[MAX_USER_SIZE + 1] = {0};
-
+static struct timer_list timer_1hz;
 static unsigned int *gpio_registers = NULL;
-static unsigned int gpio_selected = 22;
-
+static unsigned int gpio_selected = 20;
 struct cdev *gpio_cdev;
-int drv_major = 0;
+static int drv_major = 0;
+static int gpio_value;
 
 static void gpio_pin_setup(unsigned int pin) {
     unsigned int fsel_index = pin / 10;
@@ -36,12 +32,14 @@ static void gpio_pin_setup(unsigned int pin) {
     return;
 }
 
-static int read_gpio(unsigned int pin) {
-    unsigned int lev_index = pin / 32;
-    unsigned int lev_bitpos = pin % 32;
+static void read_gpio(struct timer_list *timer) {
+    printk("Reading GPIO %d\n", gpio_selected);
+    unsigned int lev_index = gpio_selected / 32;
+    unsigned int lev_bitpos = gpio_selected % 32;
     volatile unsigned int* gpio_lev = (volatile unsigned int*)((char*)gpio_registers + 0x34 + (lev_index * 4));
 
-    return (*gpio_lev & (1 << lev_bitpos)) ? 1 : 0;
+    gpio_value = *gpio_lev & (1 << lev_bitpos) ? 1 : 0;
+    mod_timer(timer, jiffies + msecs_to_jiffies(INTERVAL_MS));
 }
 
 ssize_t read(struct file *file, char __user *buf, size_t count, loff_t *f_pos)
@@ -50,14 +48,12 @@ ssize_t read(struct file *file, char __user *buf, size_t count, loff_t *f_pos)
         return 0; //EOF
     }
 
-    int r = read_gpio(gpio_selected);
-    udelay(1000);
-    if(copy_to_user(buf, &r, sizeof(r)))
+    if(copy_to_user(buf, &gpio_value, sizeof(gpio_value)))
     {
         return -EFAULT;
     
     }
-    return sizeof(r);
+    return sizeof(gpio_value);
 }
 
 ssize_t write(struct file *file, const char __user *user, size_t size, loff_t *off)
@@ -125,8 +121,11 @@ static int __init gpio_module_init(void) {
         return -1;
     }
 
-    printk("Successfully loaded GPIO driver\n");
+    gpio_pin_setup(gpio_selected);
+    timer_setup(&timer_1hz, read_gpio, 0);
+    mod_timer(&timer_1hz, jiffies + msecs_to_jiffies(INTERVAL_MS));
 
+    printk("Successfully loaded GPIO driver\n");
     return 0;
 }
 
@@ -136,6 +135,7 @@ static void __exit gpio_module_exit(void)
     dev_t dev = MKDEV(drv_major,0);
     cdev_del(gpio_cdev);
     unregister_chrdev_region(dev, 1);
+    del_timer(&timer_1hz); //Se elimina el timer.
 }
 
 module_init(gpio_module_init);
